@@ -38,12 +38,12 @@ posinlist = 0.25
 # circle
 # Radius of the circle (AU) to initially try placing a system
 # when generating locations
-rstart = 4.
+min_radius = 4.
 # number of tries to randomly place a system at a given radius
 # before expanding the circle
-maxtry = 50
+max_placing_attempts = 10
 # minimum spacing between systems (AU)
-spacing = 0.3
+min_dist_between_systems = 0.3
 
 # which font to use for the text
 fontfile = os.path.join(cd, 'Avenir-Black.otf')
@@ -51,8 +51,8 @@ fontfam = 'normal'
 fontcol = 'white'
 
 # font sizes at various resolutions
-fszs1 = {480: 12, 720: 14, 1080: 22}
-fszs2 = {480: 15, 720: 17, 1080: 27}
+fontsizes_1 = {480: 12, 720: 14, 1080: 22}
+fontsizes_2 = {480: 15, 720: 17, 1080: 27}
 
 # background color
 background_color = 'black'
@@ -87,8 +87,8 @@ nframes = 2 * 30
 times = np.arange(1591 - nframes / 2., 1591, 0.5)
 
 # setup for the custom zoom levels
-inds = np.arange(len(times))
-nmax = inds[-1]
+sys_indexed_by_size = np.arange(len(times))
+nmax = sys_indexed_by_size[-1]
 zooms = np.ones_like(times)
 
 # what zoom level each frame is at (1. means default with everything)
@@ -114,7 +114,7 @@ zooms[zooms < 0.] = np.interp(inds[zooms < 0.], inds[zooms > 0.],
 time0 = dt.datetime(2009, 1, 1, 12)
 
 # the KIC number given to the solar system
-kicsolar = -5
+our_KIC_index = -5
 
 # load in the data from the KOI list
 
@@ -142,25 +142,25 @@ if centers_file is not None:
 """
 
 
-multikics, nct = np.unique(kepler_ids, return_counts=True)
+solarsys_ids, system_n_exoplanets = np.unique(kepler_ids, return_counts=True)
 """
 # we only want to plot multi-planet systems
 multikics = multikics[nct > 1]
 """
-maxsemis = multikics * 0.
-nplan = len(multikics)
+solarsys_largest_orbit = np.empty_like(solarsys_ids)
+n_planets = len(solarsys_ids)
 
 # the maximum size needed for each system
-for ii in np.arange(len(multikics)):
-    maxsemis[ii] = np.max(orbit_semimajor_axis[np.where(kepler_ids == multikics[ii])[0]])
+for ii in range(len(solarsys_ids)):
+    solarsys_largest_orbit[ii] = np.max(orbit_semimajor_axis[np.where(kepler_ids == solarsys_ids[ii])[0]])
 
 # place the smallest ones first, but add noise
 # so they aren't perfectly in order
-inds = np.argsort(maxsemis + np.random.randn(len(maxsemis)) * 2.65)
+sys_indexed_by_size = np.argsort(solarsys_largest_orbit + np.random.randn(len(solarsys_largest_orbit)) * 2.65)
 
 # reorder to place them
-maxsemis = maxsemis[inds]
-multikics = multikics[inds]
+solarsys_largest_orbit = solarsys_largest_orbit[sys_indexed_by_size]
+solarsys_ids = solarsys_ids[sys_indexed_by_size]
 
 '''
 # add in the solar system if desired
@@ -183,19 +183,20 @@ if addsolar:
 maxratio = 16.5 / 9
 minratio = 14.3 / 9
 
+# TODO: instead of using concatinate, premake an empty array and update its values
 xcens = np.array([])
 ycens = np.array([])
 # place all the planets without overlapping or violating aspect ratio
-for ii in np.arange(nplan):
+for ii in np.arange(n_planets):
     # reset the counters
     repeat = True
-    r0 = rstart * 1.
-    ct = 0
+    radius_scaling = min_radius * 1.
+    attempt_counter = 0
     ratio = 1.
 
     # progress bar
     if (ii % 20) == 0:
-        print( 'Placing {0} of {1} planets'.format(ii, nplan))
+        print( 'Placing {0} of {1} planets'.format(ii, n_planets))
 
     """
     # put the solar system at its fixed position if desired
@@ -204,32 +205,33 @@ for ii in np.arange(nplan):
         ycens = np.concatenate((ycens, [ssy]))
         repeat = False
     else:
-        xcens = np.concatenate((xcens, [0.]))
-        ycens = np.concatenate((ycens, [0.]))
     """
+    # TODO optimize
+    xcens = np.concatenate((xcens, [0.]))
+    ycens = np.concatenate((ycens, [0.]))
 
     # repeat until we find an open location for this system
     while repeat:
         # pick a random radius (up to our limit) and angle
-        r = np.random.rand() * r0
-        theta = np.random.rand() * 2. * np.pi
-        xcens[ii] = r * np.cos(theta)
-        ycens[ii] = r * np.sin(theta)
+        random_radius = np.random.rand() * radius_scaling
+        random_angle = np.random.rand() * 2. * np.pi
+        xcens[ii] = random_radius * np.cos(random_angle)
+        ycens[ii] = random_radius * np.sin(random_angle)
 
         # check what the aspect ratio would be if we place it here
-        xex = (xcens + maxsemis[:ii + 1]).max() - \
-              (xcens - maxsemis[:ii + 1]).min()
-        yex = (ycens + maxsemis[:ii + 1]).max() - \
-              (ycens - maxsemis[:ii + 1]).min()
-        ratio = xex / yex
+        x_bounds = (xcens + solarsys_largest_orbit[:ii + 1]).max() - \
+                   (xcens - solarsys_largest_orbit[:ii + 1]).min()
+        y_bounds = (ycens + solarsys_largest_orbit[:ii + 1]).max() - \
+                   (ycens - solarsys_largest_orbit[:ii + 1]).min()
+        ratio = x_bounds / y_bounds
 
         # how far apart are all systems
         dists = np.sqrt((xcens - xcens[ii]) ** 2. +
                         (ycens - ycens[ii]) ** 2.)
-        rsum = maxsemis + maxsemis[ii]
+        rsum = solarsys_largest_orbit + solarsys_largest_orbit[ii]
 
         # systems that overlap
-        bad = np.where(dists < rsum[:ii + 1] + spacing)
+        bad = np.where(dists < rsum[:ii + 1] + min_dist_between_systems)
 
         # either the systems overlap or we've placed a lot and
         # the aspect ratio isn't good enough so try again
@@ -239,12 +241,12 @@ for ii in np.arange(nplan):
 
         # if we've been trying to place this system but can't get it
         # at this radius, expand the search zone
-        if ct > maxtry:
-            ct = 0
+        if attempt_counter > max_placing_attempts:
+            attempt_counter = 0
             # add equal area every time
-            r0 = np.sqrt(rstart ** 2. + r0 ** 2.)
+            radius_scaling = 2.0 #np.sqrt(min_radius ** 2. + radius_scaling ** 2.)
 
-        ct += 1
+        attempt_counter += 1
 """
 # save this placement distribution if desired
 if scenfile is not None:
@@ -257,14 +259,14 @@ plt.close('all')
 
 # make a diagnostic plot showing the distribution of systems
 fig = plt.figure()
-plt.xlim((xcens - maxsemis).min(), (xcens + maxsemis).max())
-plt.ylim((ycens - maxsemis).min(), (ycens + maxsemis).max())
+plt.xlim((xcens - solarsys_largest_orbit).min(), (xcens + solarsys_largest_orbit).max())
+plt.ylim((ycens - solarsys_largest_orbit).min(), (ycens + solarsys_largest_orbit).max())
 plt.gca().set_aspect('equal', adjustable='box')
 plt.xlabel('AU')
 plt.ylabel('AU')
 
-for ii in np.arange(nplan):
-    c = plt.Circle((xcens[ii], ycens[ii]), maxsemis[ii], clip_on=False,
+for ii in np.arange(n_planets):
+    c = plt.Circle((xcens[ii], ycens[ii]), solarsys_largest_orbit[ii], clip_on=False,
                    alpha=0.3)
     fig.gca().add_artist(c)
 
@@ -278,7 +280,7 @@ usedkics = np.array([])
 fullxcens = np.array([])
 fullycens = np.array([])
 
-for ii in np.arange(nplan):
+for ii in np.arange(n_planets):
     """
     # known solar system parameters
     if addsolar and multikics[ii] == kicsolar:
@@ -303,7 +305,7 @@ for ii in np.arange(nplan):
         continue
     """
 
-    fd = np.where(kepler_ids == multikics[ii])[0]
+    fd = np.where(kepler_ids == solarsys_ids[ii])[0]
     # get the values for this system
     usedkics = np.concatenate((usedkics, kepler_ids[fd]))
     t0s = np.concatenate((t0s, dateof_1st_transit_detected[fd]))
@@ -342,7 +344,7 @@ fig.patch.set_facecolor(background_color)
 plt.gca().patch.set_facecolor(background_color)
 
 # don't count the orbits of the outer solar system in finding figure limits
-ns = np.where(usedkics != kicsolar)[0]
+ns = np.where(usedkics != our_KIC_index)[0]
 
 # this section manually makes the aspect ratio equal
 #  but completely fills the figure
@@ -378,7 +380,7 @@ for ii in np.arange(len(t0s)):
     zo = 0
     lw = lws[resolution]
     # dashed, thicker ones for the solar system
-    if usedkics[ii] == kicsolar:
+    if usedkics[ii] == our_KIC_index:
         ls = 'dashed'
         zo = -3
         lw = sslws[resolution]
@@ -426,8 +428,8 @@ tmp = plt.scatter(fullxcens + semis * np.cos(phase),
                   edgecolors='none', lw=0, s=pscale, c=teqs, vmin=ticks.min(),
                   vmax=ticks.max(), zorder=3, cmap=mycmap, clip_on=False)
 
-fsz1 = fszs1[resolution]
-fsz2 = fszs2[resolution]
+fsz1 = fontsizes_1[resolution]
+fsz2 = fontsizes_2[resolution]
 prop = fm.FontProperties(fname=fontfile)
 
 """
