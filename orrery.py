@@ -143,25 +143,25 @@ if centers_file is not None:
 """
 
 
-solarsys_ids, system_n_exoplanets = np.unique(star_ids, return_counts=True)
+uniq_solarsys_ids, system_n_exoplanets = np.unique(star_ids, return_counts=True)
 """
 # we only want to plot multi-planet systems
 multikics = multikics[nct > 1]
 """
-n_solar_systems = len(solarsys_ids)
+n_solar_systems = len(uniq_solarsys_ids)
 
 # the maximum size needed for each system
-solarsys_largest_orbit = np.empty(n_solar_systems)
+solarsys_furthest_reach = np.empty(n_solar_systems)
 for ii in range(n_solar_systems):
-    solarsys_largest_orbit[ii] = np.max(planet_reach[np.where(star_ids == solarsys_ids[ii])[0]])
+    solarsys_furthest_reach[ii] = np.max(planet_reach[np.where(star_ids == uniq_solarsys_ids[ii])[0]])
 
 # place the smallest ones first, but add noise
 # so they aren't perfectly in order
-sys_indexed_by_size = np.argsort(solarsys_largest_orbit + np.random.randn(len(solarsys_largest_orbit)) * 2.65)
+sys_indexed_by_size = np.argsort(solarsys_furthest_reach + np.random.randn(len(solarsys_furthest_reach)) * 2.65)
 
 # reorder to place them
-solarsys_largest_orbit = solarsys_largest_orbit[sys_indexed_by_size]
-solarsys_ids = solarsys_ids[sys_indexed_by_size]
+solarsys_furthest_reach = solarsys_furthest_reach[sys_indexed_by_size]
+uniq_solarsys_ids = uniq_solarsys_ids[sys_indexed_by_size]
 
 '''
 # add in the solar system if desired
@@ -229,7 +229,7 @@ for ii in range(n_solar_systems):
         # the [:ii + 1] slice is because future positions are still empty
         dist_from_all_other_centers = np.sqrt((system_xcens[:ii + 1] - system_xcens[ii]) ** 2. +
                                               (system_ycens[:ii + 1] - system_ycens[ii]) ** 2.)
-        sum_of_largest_orbit_radii = solarsys_largest_orbit + solarsys_largest_orbit[ii]
+        sum_of_largest_orbit_radii = solarsys_furthest_reach + solarsys_furthest_reach[ii]
 
         # systems that overlap
         bad = np.where(dist_from_all_other_centers < sum_of_largest_orbit_radii[:ii + 1] + min_dist_between_systems)
@@ -264,24 +264,26 @@ plt.close('all')
 
 # make a diagnostic plot showing the distribution of systems
 fig = plt.figure()
-plt.xlim((system_xcens - solarsys_largest_orbit).min(), (system_xcens + solarsys_largest_orbit).max())
-plt.ylim((system_ycens - solarsys_largest_orbit).min(), (system_ycens + solarsys_largest_orbit).max())
+plt.xlim((system_xcens - solarsys_furthest_reach).min(), (system_xcens + solarsys_furthest_reach).max())
+plt.ylim((system_ycens - solarsys_furthest_reach).min(), (system_ycens + solarsys_furthest_reach).max())
 plt.gca().set_aspect('equal', adjustable='box')
 plt.xlabel('AU')
 plt.ylabel('AU')
 
-for ii in np.arange(n_solar_systems):
-    c = plt.Circle((system_xcens[ii], system_ycens[ii]), solarsys_largest_orbit[ii], clip_on=False,
+for ii in range(n_solar_systems):
+    # this seems to make a circle at the largest orbit
+    c = plt.Circle((system_xcens[ii], system_ycens[ii]), solarsys_furthest_reach[ii], clip_on=False,
                    alpha=0.3)
     fig.gca().add_artist(c)
 
 # all of the parameters we need for the plot
+# TODO: optimize
 t0s = np.array([])
 periods = np.array([])
 semis = np.array([])
 radii = np.array([])
 teqs = np.array([])
-usedkics = np.array([])
+used_planets = np.array([])
 fullxcens = np.array([])
 fullycens = np.array([])
 
@@ -310,21 +312,21 @@ for ii in range(n_solar_systems):
         continue
     """
 
-    fd = np.where(star_ids == solarsys_ids[ii])[0]
+    exos_in_this_system_indeces = np.where(star_ids == uniq_solarsys_ids[ii])[0]
     # get the values for this system
-    usedkics = np.concatenate((usedkics, star_ids[fd]))
-    t0s = np.concatenate((t0s, dateof_1st_transit_detected[fd]))
-    periods = np.concatenate((periods, orbital_periods[fd]))
-    semis = np.concatenate((semis, orbit_semimajor_axis[fd]))
-    radii = np.concatenate((radii, exo_radius[fd]))
-    teqs = np.concatenate((teqs, equilibrium_temperatures[fd]))
-    fullxcens = np.concatenate((fullxcens, np.zeros(len(fd)) + system_xcens[ii]))
-    fullycens = np.concatenate((fullycens, np.zeros(len(fd)) + system_ycens[ii]))
+    used_planets = np.concatenate((used_planets, star_ids[exos_in_this_system_indeces]))
+    t0s = np.concatenate((t0s, dateof_1st_transit_detected[exos_in_this_system_indeces]))
+    periods = np.concatenate((periods, orbital_periods[exos_in_this_system_indeces]))
+    semis = np.concatenate((semis, orbit_semimajor_axis[exos_in_this_system_indeces]))
+    radii = np.concatenate((radii, exo_radius[exos_in_this_system_indeces]))
+    teqs = np.concatenate((teqs, equilibrium_temperatures[exos_in_this_system_indeces]))
+    fullxcens = np.concatenate((fullxcens, np.zeros(len(exos_in_this_system_indeces)) + system_xcens[ii]))
+    fullycens = np.concatenate((fullycens, np.zeros(len(exos_in_this_system_indeces)) + system_ycens[ii]))
 
 # sort by radius so that the large planets are on the bottom and
 # don't cover smaller planets
 rs = np.argsort(radii)[::-1]
-usedkics = usedkics[rs]
+used_planets = used_planets[rs]
 t0s = t0s[rs]
 periods = periods[rs]
 semis = semis[rs]
@@ -332,6 +334,7 @@ radii = radii[rs]
 teqs = teqs[rs]
 fullxcens = fullxcens[rs]
 fullycens = fullycens[rs]
+n_planets = len(radii)
 
 if makemovie:
     plt.ioff()
@@ -349,7 +352,7 @@ fig.patch.set_facecolor(background_color)
 plt.gca().patch.set_facecolor(background_color)
 
 # don't count the orbits of the outer solar system in finding figure limits
-ns = np.where(usedkics != our_KIC_index)[0]
+ns = np.where(used_planets != our_KIC_index)[0]
 
 # this section manually makes the aspect ratio equal
 #  but completely fills the figure
@@ -378,14 +381,15 @@ else:
 
 lws = {480: 1, 720: 1, 1080: 2}
 sslws = {480: 2, 720: 2, 1080: 4}
+
 # plot the orbital circles for every planet
-for ii in np.arange(len(t0s)):
+for ii in range(n_planets):
     # solid, thinner lines for normal planets
     ls = 'solid'
     zo = 0
     lw = lws[resolution]
     # dashed, thicker ones for the solar system
-    if usedkics[ii] == our_KIC_index:
+    if used_planets[ii] == our_KIC_index:
         ls = 'dashed'
         zo = -3
         lw = sslws[resolution]
@@ -399,20 +403,22 @@ for ii in np.arange(len(t0s)):
 sscales = {480: 12., 720: 30., 1080: 50.}
 sscale = sscales[resolution]
 
-rearth = 1.
+
+radius_earth = 1.
 rnep = 3.856
 rjup = 10.864
 rmerc = 0.383
 # for the planet size legend
-solarsys = np.array([rmerc, rearth, rnep, rjup])
+solarsys = np.array([rmerc, radius_earth, rnep, rjup])
 pnames = ['Mercury', 'Earth', 'Neptune', 'Jupiter']
 csolar = np.array([409, 255, 46, 112])
 
-# keep the smallest planets visible and the largest from being too huge
-solarsys = np.clip(solarsys, 0.8, 1.3 * rjup)
+## keep the smallest planets visible and the largest from being too huge
+#solarsys = np.clip(solarsys, 0.8, 1.3 * rjup)
 solarscale = sscale * solarsys
 
-radii = np.clip(radii, 0.8, 1.3 * rjup)
+#radii = np.clip(radii, 0.8, 1.3 * rjup)
+
 pscale = sscale * radii
 
 # color bar temperature tick values and labels
