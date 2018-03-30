@@ -68,7 +68,7 @@ legalpha = 0.7
 # are we making the png files for a movie or gif
 makemovie = True
 # resolution of the images. Currently support 480, 720 or 1080.
-reso = 1080
+reso = 480
 
 # output directory for the images in the movie
 # (will be created if it doesn't yet exist)
@@ -78,7 +78,7 @@ outdir = os.path.join(cd, 'movie/')
 # number of frames to produce
 # using ffmpeg with the palette at (sec * frames/sec)
 # nframes = 40 * 20
-nframes = 60 * 30
+nframes = 2 * 30
 
 # times to evaluate the planets at
 # Kepler observed from 120.5 to 1591
@@ -183,7 +183,7 @@ else:
 
         # progress bar
         if (ii % 20) == 0:
-            print 'Placing {0} of {1} planets'.format(ii, nplan)
+            print( 'Placing {0} of {1} planets'.format(ii, nplan))
 
         # put the solar system at its fixed position if desired
         if multikics[ii] == kicsolar and fixedpos:
@@ -557,4 +557,4 @@ if makemovie:
         plt.savefig(os.path.join(outdir, 'fig{0:04d}.png'.format(ii)),
                     facecolor=fig.get_facecolor(), edgecolor='none')
         if not (ii % 10):
-            print '{0} of {1} frames'.format(ii, len(times))
+            print( '{0} of {1} frames'.format(ii, len(times)))
