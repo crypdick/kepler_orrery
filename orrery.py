@@ -117,133 +117,141 @@ time0 = dt.datetime(2009, 1, 1, 12)
 kicsolar = -5
 
 # load in the data from the KOI list
-kics, pds, it0s, radius, iteqs, semi = np.genfromtxt(
+
+kepler_ids, orbital_periods, dateof_1st_transit_detected, exo_radius, \
+equilibrium_temperatures, orbit_semimajor_axis = np.genfromtxt(
     koilist, unpack=True, usecols=(1, 5, 8, 20, 26, 23), delimiter=',')
 
 # grab the KICs with known parameters
-good = (np.isfinite(semi) & np.isfinite(pds) &
-        np.isfinite(radius) & np.isfinite(iteqs))
+good = (np.isfinite(orbit_semimajor_axis) & np.isfinite(orbital_periods) &
+        np.isfinite(exo_radius) & np.isfinite(equilibrium_temperatures))
 
-kics = kics[good]
-pds = pds[good]
-it0s = it0s[good]
-semi = semi[good]
-radius = radius[good]
-iteqs = iteqs[good]
+kepler_ids = kepler_ids[good]
+orbital_periods = orbital_periods[good]
+dateof_1st_transit_detected = dateof_1st_transit_detected[good]
+orbit_semimajor_axis = orbit_semimajor_axis[good]
+exo_radius = exo_radius[good]
+equilibrium_temperatures = equilibrium_temperatures[good]
 
+"""
 # if we've already decided where to put each system, load it up
 if centers_file is not None:
     multikics, xcens, ycens, maxsemis = np.loadtxt(centers_file, unpack=True)
     nplan = len(multikics)
 # otherwise figure out how to fit all the planets into a nice distribution
-else:
-    # we only want to plot multi-planet systems
-    multikics, nct = np.unique(kics, return_counts=True)
-    multikics = multikics[nct > 1]
-    maxsemis = multikics * 0.
-    nplan = len(multikics)
+"""
 
-    # the maximum size needed for each system
-    for ii in np.arange(len(multikics)):
-        maxsemis[ii] = np.max(semi[np.where(kics == multikics[ii])[0]])
 
-    # place the smallest ones first, but add noise
-    # so they aren't perfectly in order
-    inds = np.argsort(maxsemis + np.random.randn(len(maxsemis)) * 2.65)
+multikics, nct = np.unique(kepler_ids, return_counts=True)
+"""
+# we only want to plot multi-planet systems
+multikics = multikics[nct > 1]
+"""
+maxsemis = multikics * 0.
+nplan = len(multikics)
 
-    # reorder to place them
-    maxsemis = maxsemis[inds]
-    multikics = multikics[inds]
+# the maximum size needed for each system
+for ii in np.arange(len(multikics)):
+    maxsemis[ii] = np.max(orbit_semimajor_axis[np.where(kepler_ids == multikics[ii])[0]])
 
-    '''
-    # add in the solar system if desired
-    if addsolar:
-        nplan += 1
-        # we know where we want the solar system to be placed, place it first
-        if fixedpos:
-            insind = 0
-        # otherwise treat it as any other system
-        # and place it at this point through the list
-        else:
-            insind = int(posinlist * len(maxsemis))
+# place the smallest ones first, but add noise
+# so they aren't perfectly in order
+inds = np.argsort(maxsemis + np.random.randn(len(maxsemis)) * 2.65)
 
-        maxsemis = np.insert(maxsemis, insind, 1.524)
-        multikics = np.insert(multikics, insind, kicsolar)
-    '''
+# reorder to place them
+maxsemis = maxsemis[inds]
+multikics = multikics[inds]
 
-    # ratio = x extent / y extent
-    # what is the maximum and minimum aspect ratio of the final placement
-    maxratio = 16.5 / 9
-    minratio = 14.3 / 9
+'''
+# add in the solar system if desired
+if addsolar:
+    nplan += 1
+    # we know where we want the solar system to be placed, place it first
+    if fixedpos:
+        insind = 0
+    # otherwise treat it as any other system
+    # and place it at this point through the list
+    else:
+        insind = int(posinlist * len(maxsemis))
 
-    xcens = np.array([])
-    ycens = np.array([])
-    # place all the planets without overlapping or violating aspect ratio
-    for ii in np.arange(nplan):
-        # reset the counters
-        repeat = True
-        r0 = rstart * 1.
-        ct = 0
-        ratio = 1.
+    maxsemis = np.insert(maxsemis, insind, 1.524)
+    multikics = np.insert(multikics, insind, kicsolar)
+'''
 
-        # progress bar
-        if (ii % 20) == 0:
-            print( 'Placing {0} of {1} planets'.format(ii, nplan))
+# ratio = x extent / y extent
+# what is the maximum and minimum aspect ratio of the final placement
+maxratio = 16.5 / 9
+minratio = 14.3 / 9
 
-        """
-        # put the solar system at its fixed position if desired
-        if multikics[ii] == kicsolar and fixedpos:
-            xcens = np.concatenate((xcens, [ssx]))
-            ycens = np.concatenate((ycens, [ssy]))
+xcens = np.array([])
+ycens = np.array([])
+# place all the planets without overlapping or violating aspect ratio
+for ii in np.arange(nplan):
+    # reset the counters
+    repeat = True
+    r0 = rstart * 1.
+    ct = 0
+    ratio = 1.
+
+    # progress bar
+    if (ii % 20) == 0:
+        print( 'Placing {0} of {1} planets'.format(ii, nplan))
+
+    """
+    # put the solar system at its fixed position if desired
+    if multikics[ii] == kicsolar and fixedpos:
+        xcens = np.concatenate((xcens, [ssx]))
+        ycens = np.concatenate((ycens, [ssy]))
+        repeat = False
+    else:
+        xcens = np.concatenate((xcens, [0.]))
+        ycens = np.concatenate((ycens, [0.]))
+    """
+
+    # repeat until we find an open location for this system
+    while repeat:
+        # pick a random radius (up to our limit) and angle
+        r = np.random.rand() * r0
+        theta = np.random.rand() * 2. * np.pi
+        xcens[ii] = r * np.cos(theta)
+        ycens[ii] = r * np.sin(theta)
+
+        # check what the aspect ratio would be if we place it here
+        xex = (xcens + maxsemis[:ii + 1]).max() - \
+              (xcens - maxsemis[:ii + 1]).min()
+        yex = (ycens + maxsemis[:ii + 1]).max() - \
+              (ycens - maxsemis[:ii + 1]).min()
+        ratio = xex / yex
+
+        # how far apart are all systems
+        dists = np.sqrt((xcens - xcens[ii]) ** 2. +
+                        (ycens - ycens[ii]) ** 2.)
+        rsum = maxsemis + maxsemis[ii]
+
+        # systems that overlap
+        bad = np.where(dists < rsum[:ii + 1] + spacing)
+
+        # either the systems overlap or we've placed a lot and
+        # the aspect ratio isn't good enough so try again
+        if len(bad[0]) == 1 and (
+                    (minratio <= ratio <= maxratio) or ii < 50):
             repeat = False
-        else:
-            xcens = np.concatenate((xcens, [0.]))
-            ycens = np.concatenate((ycens, [0.]))
-        """
 
-        # repeat until we find an open location for this system
-        while repeat:
-            # pick a random radius (up to our limit) and angle
-            r = np.random.rand() * r0
-            theta = np.random.rand() * 2. * np.pi
-            xcens[ii] = r * np.cos(theta)
-            ycens[ii] = r * np.sin(theta)
+        # if we've been trying to place this system but can't get it
+        # at this radius, expand the search zone
+        if ct > maxtry:
+            ct = 0
+            # add equal area every time
+            r0 = np.sqrt(rstart ** 2. + r0 ** 2.)
 
-            # check what the aspect ratio would be if we place it here
-            xex = (xcens + maxsemis[:ii + 1]).max() - \
-                  (xcens - maxsemis[:ii + 1]).min()
-            yex = (ycens + maxsemis[:ii + 1]).max() - \
-                  (ycens - maxsemis[:ii + 1]).min()
-            ratio = xex / yex
-
-            # how far apart are all systems
-            dists = np.sqrt((xcens - xcens[ii]) ** 2. +
-                            (ycens - ycens[ii]) ** 2.)
-            rsum = maxsemis + maxsemis[ii]
-
-            # systems that overlap
-            bad = np.where(dists < rsum[:ii + 1] + spacing)
-
-            # either the systems overlap or we've placed a lot and
-            # the aspect ratio isn't good enough so try again
-            if len(bad[0]) == 1 and (
-                        (minratio <= ratio <= maxratio) or ii < 50):
-                repeat = False
-
-            # if we've been trying to place this system but can't get it
-            # at this radius, expand the search zone
-            if ct > maxtry:
-                ct = 0
-                # add equal area every time
-                r0 = np.sqrt(rstart ** 2. + r0 ** 2.)
-
-            ct += 1
-
-    # save this placement distribution if desired
-    if scenfile is not None:
-        np.savetxt(scenfile,
-                   np.column_stack((multikics, xcens, ycens, maxsemis)),
-                   fmt=['%d', '%f', '%f', '%f'])
+        ct += 1
+"""
+# save this placement distribution if desired
+if scenfile is not None:
+    np.savetxt(scenfile,
+               np.column_stack((multikics, xcens, ycens, maxsemis)),
+               fmt=['%d', '%f', '%f', '%f'])
+"""
 
 plt.close('all')
 
@@ -295,14 +303,14 @@ for ii in np.arange(nplan):
         continue
     """
 
-    fd = np.where(kics == multikics[ii])[0]
+    fd = np.where(kepler_ids == multikics[ii])[0]
     # get the values for this system
-    usedkics = np.concatenate((usedkics, kics[fd]))
-    t0s = np.concatenate((t0s, it0s[fd]))
-    periods = np.concatenate((periods, pds[fd]))
-    semis = np.concatenate((semis, semi[fd]))
-    radii = np.concatenate((radii, radius[fd]))
-    teqs = np.concatenate((teqs, iteqs[fd]))
+    usedkics = np.concatenate((usedkics, kepler_ids[fd]))
+    t0s = np.concatenate((t0s, dateof_1st_transit_detected[fd]))
+    periods = np.concatenate((periods, orbital_periods[fd]))
+    semis = np.concatenate((semis, orbit_semimajor_axis[fd]))
+    radii = np.concatenate((radii, exo_radius[fd]))
+    teqs = np.concatenate((teqs, equilibrium_temperatures[fd]))
     fullxcens = np.concatenate((fullxcens, np.zeros(len(fd)) + xcens[ii]))
     fullycens = np.concatenate((fullycens, np.zeros(len(fd)) + ycens[ii]))
 
