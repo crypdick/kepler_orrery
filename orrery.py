@@ -41,7 +41,7 @@ posinlist = 0.25
 min_radius = 4.
 # number of tries to randomly place a system at a given radius
 # before expanding the circle
-max_placing_attempts = 10
+max_placing_attempts = 20
 # minimum spacing between systems (AU)
 min_dist_between_systems = 0.3
 
@@ -118,7 +118,7 @@ our_KIC_index = -5
 
 # load in the data from the KOI list
 
-kepler_ids, orbital_periods, dateof_1st_transit_detected, exo_radius, \
+star_ids, orbital_periods, dateof_1st_transit_detected, exo_radius, \
 equilibrium_temperatures, orbit_semimajor_axis = np.genfromtxt(
     koilist, unpack=True, usecols=(1, 5, 8, 20, 26, 23), delimiter=',')
 
@@ -126,11 +126,12 @@ equilibrium_temperatures, orbit_semimajor_axis = np.genfromtxt(
 good = (np.isfinite(orbit_semimajor_axis) & np.isfinite(orbital_periods) &
         np.isfinite(exo_radius) & np.isfinite(equilibrium_temperatures))
 
-kepler_ids = kepler_ids[good]
+star_ids = star_ids[good]
 orbital_periods = orbital_periods[good]
 dateof_1st_transit_detected = dateof_1st_transit_detected[good]
 orbit_semimajor_axis = orbit_semimajor_axis[good]
 exo_radius = exo_radius[good]
+planet_reach = exo_radius + orbit_semimajor_axis
 equilibrium_temperatures = equilibrium_temperatures[good]
 
 """
@@ -142,17 +143,17 @@ if centers_file is not None:
 """
 
 
-solarsys_ids, system_n_exoplanets = np.unique(kepler_ids, return_counts=True)
+solarsys_ids, system_n_exoplanets = np.unique(star_ids, return_counts=True)
 """
 # we only want to plot multi-planet systems
 multikics = multikics[nct > 1]
 """
-solarsys_largest_orbit = np.empty_like(solarsys_ids)
-n_planets = len(solarsys_ids)
+n_solar_systems = len(solarsys_ids)
 
 # the maximum size needed for each system
-for ii in range(len(solarsys_ids)):
-    solarsys_largest_orbit[ii] = np.max(orbit_semimajor_axis[np.where(kepler_ids == solarsys_ids[ii])[0]])
+solarsys_largest_orbit = np.empty(n_solar_systems)
+for ii in range(n_solar_systems):
+    solarsys_largest_orbit[ii] = np.max(planet_reach[np.where(star_ids == solarsys_ids[ii])[0]])
 
 # place the smallest ones first, but add noise
 # so they aren't perfectly in order
@@ -183,20 +184,20 @@ if addsolar:
 maxratio = 16.5 / 9
 minratio = 14.3 / 9
 
-# TODO: instead of using concatinate, premake an empty array and update its values
-xcens = np.array([])
-ycens = np.array([])
+left_bound, right_bound, top_bound, bottom_bound = 0., 0., 0., 0.
+system_xcens = np.empty(n_solar_systems)
+system_ycens = np.empty(n_solar_systems)
 # place all the planets without overlapping or violating aspect ratio
-for ii in np.arange(n_planets):
+for ii in range(n_solar_systems):
     # reset the counters
-    repeat = True
+    not_placed = True
     radius_scaling = min_radius * 1.
     attempt_counter = 0
     ratio = 1.
 
     # progress bar
     if (ii % 20) == 0:
-        print( 'Placing {0} of {1} planets'.format(ii, n_planets))
+        print( 'Placing {0} of {1} planets'.format(ii, n_solar_systems))
 
     """
     # put the solar system at its fixed position if desired
@@ -206,47 +207,51 @@ for ii in np.arange(n_planets):
         repeat = False
     else:
     """
-    # TODO optimize
-    xcens = np.concatenate((xcens, [0.]))
-    ycens = np.concatenate((ycens, [0.]))
 
     # repeat until we find an open location for this system
-    while repeat:
+    while not_placed:
         # pick a random radius (up to our limit) and angle
-        random_radius = np.random.rand() * radius_scaling
+        #random_radius = np.random.rand() * radius_scaling
         random_angle = np.random.rand() * 2. * np.pi
-        xcens[ii] = random_radius * np.cos(random_angle)
-        ycens[ii] = random_radius * np.sin(random_angle)
+        system_xcens[ii] = radius_scaling * np.cos(random_angle)
+        system_ycens[ii] = radius_scaling * np.sin(random_angle)
 
+        """ let's stop caring about aspect ratio
+        # if we decide to care later, don't compare each system each iteratioN!
         # check what the aspect ratio would be if we place it here
-        x_bounds = (xcens + solarsys_largest_orbit[:ii + 1]).max() - \
-                   (xcens - solarsys_largest_orbit[:ii + 1]).min()
-        y_bounds = (ycens + solarsys_largest_orbit[:ii + 1]).max() - \
-                   (ycens - solarsys_largest_orbit[:ii + 1]).min()
+        x_bounds = (system_xcens.max() + solarsys_largest_orbit[:ii + 1]).max() - \
+                   (system_xcens[ii] - solarsys_largest_orbit[:ii + 1]).min()
+        y_bounds = (system_ycens[ii] + solarsys_largest_orbit[:ii + 1]).max() - \
+                   (system_ycens[ii] - solarsys_largest_orbit[:ii + 1]).min()
         ratio = x_bounds / y_bounds
-
+        """
         # how far apart are all systems
-        dists = np.sqrt((xcens - xcens[ii]) ** 2. +
-                        (ycens - ycens[ii]) ** 2.)
-        rsum = solarsys_largest_orbit + solarsys_largest_orbit[ii]
+        # the [:ii + 1] slice is because future positions are still empty
+        dist_from_all_other_centers = np.sqrt((system_xcens[:ii + 1] - system_xcens[ii]) ** 2. +
+                                              (system_ycens[:ii + 1] - system_ycens[ii]) ** 2.)
+        sum_of_largest_orbit_radii = solarsys_largest_orbit + solarsys_largest_orbit[ii]
 
         # systems that overlap
-        bad = np.where(dists < rsum[:ii + 1] + min_dist_between_systems)
+        bad = np.where(dist_from_all_other_centers < sum_of_largest_orbit_radii[:ii + 1] + min_dist_between_systems)
 
+        """
         # either the systems overlap or we've placed a lot and
         # the aspect ratio isn't good enough so try again
         if len(bad[0]) == 1 and (
                     (minratio <= ratio <= maxratio) or ii < 50):
             repeat = False
+        """
+        # let's relax the ratio requirement
+        if len(bad[0]) == 1:  # we should only overlap with itself
+            not_placed = False
 
+        attempt_counter += 1
         # if we've been trying to place this system but can't get it
         # at this radius, expand the search zone
         if attempt_counter > max_placing_attempts:
             attempt_counter = 0
-            # add equal area every time
-            radius_scaling = 2.0 #np.sqrt(min_radius ** 2. + radius_scaling ** 2.)
+            radius_scaling *= 1.1 #np.sqrt(min_radius ** 2. + radius_scaling ** 2.)
 
-        attempt_counter += 1
 """
 # save this placement distribution if desired
 if scenfile is not None:
@@ -259,14 +264,14 @@ plt.close('all')
 
 # make a diagnostic plot showing the distribution of systems
 fig = plt.figure()
-plt.xlim((xcens - solarsys_largest_orbit).min(), (xcens + solarsys_largest_orbit).max())
-plt.ylim((ycens - solarsys_largest_orbit).min(), (ycens + solarsys_largest_orbit).max())
+plt.xlim((system_xcens - solarsys_largest_orbit).min(), (system_xcens + solarsys_largest_orbit).max())
+plt.ylim((system_ycens - solarsys_largest_orbit).min(), (system_ycens + solarsys_largest_orbit).max())
 plt.gca().set_aspect('equal', adjustable='box')
 plt.xlabel('AU')
 plt.ylabel('AU')
 
-for ii in np.arange(n_planets):
-    c = plt.Circle((xcens[ii], ycens[ii]), solarsys_largest_orbit[ii], clip_on=False,
+for ii in np.arange(n_solar_systems):
+    c = plt.Circle((system_xcens[ii], system_ycens[ii]), solarsys_largest_orbit[ii], clip_on=False,
                    alpha=0.3)
     fig.gca().add_artist(c)
 
@@ -280,7 +285,7 @@ usedkics = np.array([])
 fullxcens = np.array([])
 fullycens = np.array([])
 
-for ii in np.arange(n_planets):
+for ii in range(n_solar_systems):
     """
     # known solar system parameters
     if addsolar and multikics[ii] == kicsolar:
@@ -305,16 +310,16 @@ for ii in np.arange(n_planets):
         continue
     """
 
-    fd = np.where(kepler_ids == solarsys_ids[ii])[0]
+    fd = np.where(star_ids == solarsys_ids[ii])[0]
     # get the values for this system
-    usedkics = np.concatenate((usedkics, kepler_ids[fd]))
+    usedkics = np.concatenate((usedkics, star_ids[fd]))
     t0s = np.concatenate((t0s, dateof_1st_transit_detected[fd]))
     periods = np.concatenate((periods, orbital_periods[fd]))
     semis = np.concatenate((semis, orbit_semimajor_axis[fd]))
     radii = np.concatenate((radii, exo_radius[fd]))
     teqs = np.concatenate((teqs, equilibrium_temperatures[fd]))
-    fullxcens = np.concatenate((fullxcens, np.zeros(len(fd)) + xcens[ii]))
-    fullycens = np.concatenate((fullycens, np.zeros(len(fd)) + ycens[ii]))
+    fullxcens = np.concatenate((fullxcens, np.zeros(len(fd)) + system_xcens[ii]))
+    fullycens = np.concatenate((fullycens, np.zeros(len(fd)) + system_ycens[ii]))
 
 # sort by radius so that the large planets are on the bottom and
 # don't cover smaller planets
