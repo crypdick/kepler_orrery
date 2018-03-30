@@ -5,14 +5,13 @@ import os
 import datetime as dt
 from diverging_map import diverge_map
 import matplotlib.font_manager as fm
-from matplotlib.ticker import FixedLocator as FL
 
 # what KOI file to use
 cd = os.path.abspath(os.path.dirname(__file__))
-koilist = os.path.join(cd, 'KOI_List.txt')
-
+# koilist = os.path.join(cd, 'KOI_List.txt')
+#
 # are we loading in system locations from a previous file (None if not)
-centers_file = os.path.join(cd, 'orrery_centers.txt')
+# centers_file = None #os.path.join(cd, 'orrery_centers.txt')
 # lcenfile = None
 # if we're not loading a centers file,
 # where do we want to save the one generated (None if don't save)
@@ -38,12 +37,12 @@ posinlist = 0.25
 # circle
 # Radius of the circle (AU) to initially try placing a system
 # when generating locations
-min_radius = 4.
+# min_radius = 4.
 # number of tries to randomly place a system at a given radius
 # before expanding the circle
-max_placing_attempts = 20
+# max_placing_attempts = 20
 # minimum spacing between systems (AU)
-min_dist_between_systems = 0.3
+# min_dist_between_systems = 0.3
 
 # which font to use for the text
 fontfile = os.path.join(cd, 'Avenir-Black.otf')
@@ -86,10 +85,12 @@ nframes = 2 * 30
 # Kepler observed from 120.5 to 1591
 times = np.arange(1591 - nframes / 2., 1591, 0.5)
 
+"""
 # setup for the custom zoom levels
 sys_indexed_by_size = np.arange(len(times))
 nmax = sys_indexed_by_size[-1]
 zooms = np.ones_like(times)
+"""
 
 # what zoom level each frame is at (1. means default with everything)
 """
@@ -114,14 +115,17 @@ time0 = dt.datetime(2009, 1, 1, 12)
 
 # load in the data from the KOI list
 
-star_ids, orbital_periods, dateof_1st_transit_detected, exo_radius, \
-equilibrium_temperatures, orbit_semimajor_axis = np.genfromtxt(
-    koilist, unpack=True, usecols=(1, 5, 8, 20, 26, 23), delimiter=',')
+# star_ids, orbital_periods, dateof_1st_transit_detected, exo_radius, \
+# equilibrium_temperatures, orbit_semimajor_axis = np.genfromtxt(
+#     koilist, unpack=True, usecols=(1, 5, 8, 20, 26, 23), delimiter=',')
 
 
 # grab the KICs with known parameters
-good = (np.isfinite(orbit_semimajor_axis) & np.isfinite(orbital_periods) &
-        np.isfinite(exo_radius) & np.isfinite(equilibrium_temperatures))
+# good = (np.isfinite(orbit_semimajor_axis) & np.isfinite(orbital_periods) &
+#         np.isfinite(exo_radius) & np.isfinite(equilibrium_temperatures))
+
+# rescale orbital distances
+# orbit_semimajor_axis = np.log10(orbit_semimajor_axis)
 
 """
 # grab our solar sys
@@ -132,7 +136,6 @@ orbit_semimajor_axis = orbit_semimajor_axis[our_KIC_index]
 exo_radius = exo_radius[our_KIC_index]
 planet_reach = exo_radius + orbit_semimajor_axis
 equilibrium_temperatures = equilibrium_temperatures[our_KIC_index]
-print(exo_radius)
 """
 
 n_solar_systems = 1
@@ -156,12 +159,12 @@ system_ycens = np.array([0])
 
 
 # all of the parameters we need for the plot
-t0s = dateof_1st_transit_detected
-periods = orbital_periods
-semis = orbit_semimajor_axis
-radii = exo_radius
-teqs = equilibrium_temperatures
-used_planets = star_ids  # TODO if we throw out some systems update this
+# t0s = dateof_1st_transit_detected
+# periods = orbital_periods
+# semis = orbit_semimajor_axis
+# radii = exo_radius
+# teqs = equilibrium_temperatures
+# used_planets = star_ids  # TODO if we throw out some systems update this
 fullxcens = system_xcens
 fullycens = system_ycens
 
@@ -273,6 +276,7 @@ solarscale = sscale * solarsys
 
 pscale = sscale * radii
 
+
 # color bar temperature tick values and labels
 ticks = np.array([250, 500, 750, 1000, 1250])
 labs = ['250', '500', '750', '1000', '1250', '1500']
@@ -284,6 +288,7 @@ RGB2 = np.array([220, 55, 19])
 # create the diverging map with a white in the center
 mycmap = diverge_map(RGB1=RGB1, RGB2=RGB2, numColors=15)
 
+"""
 # just plot the planets at time 0. for this default plot
 phase = 2. * np.pi * (0. - t0s) / periods
 tmp = plt.scatter(fullxcens + semis * np.cos(phase),
@@ -294,6 +299,7 @@ tmp = plt.scatter(fullxcens + semis * np.cos(phase),
 fsz1 = fontsizes_1[resolution]
 fsz2 = fontsizes_2[resolution]
 prop = fm.FontProperties(fname=fontfile)
+"""
 
 """
 # create the 'Solar System' text identification
@@ -326,13 +332,11 @@ if legend_background:
                       transform=ax.transAxes)
     ax.add_artist(c)
     ax.add_artist(d)
-"""
 
 # appropriate spacing from the left edge for the color bar
 cbxoffs = {480: 0.09, 720: 0.07, 1080: 0.074}
 cbxoff = cbxoffs[resolution]
 
-"""
 # plot the solar system planet scale
 ax.scatter(np.zeros(len(solarscale)) + cbxoff,
            1. - 0.13 + 0.03 * np.arange(len(solarscale)), s=solarscale,
@@ -383,6 +387,7 @@ cbar.ax.set_xlabel(clab, color=fontcol, family=fontfam, fontproperties=prop,
 # switch back to the main plot
 plt.sca(ax)
 
+"""
 # upper right credit and labels text offsets
 txtxoffs = {480: 0.2, 720: 0.16, 1080: 0.16}
 txtyoffs1 = {480: 0.10, 720: 0.08, 1080: 0.08}
@@ -391,6 +396,8 @@ txtyoffs2 = {480: 0.18, 720: 0.144, 1080: 0.144}
 txtxoff = txtxoffs[resolution]
 txtyoff1 = txtyoffs1[resolution]
 txtyoff2 = txtyoffs2[resolution]
+"""
+
 
 """
 # put in the credits in the top right
@@ -404,6 +411,7 @@ plt.text(1. - txtxoff, 1. - txtyoff2, 'By Ethan Kruse\n@ethan_kruse',
          zorder=5, transform=ax.transAxes)
 """
 
+"""
 # the center of the figure
 x0 = np.mean(plt.xlim())
 y0 = np.mean(plt.ylim())
@@ -411,6 +419,7 @@ y0 = np.mean(plt.ylim())
 # width of the figure
 xdiff = np.diff(plt.xlim()) / 2.
 ydiff = np.diff(plt.ylim()) / 2.
+"""
 
 # create the output directory if necessary
 if makemovie and not os.path.exists(outdir):
@@ -425,7 +434,10 @@ if makemovie:
     # go through all the times and make the planets move
     for ii, time in enumerate(times):
         # remove old planet locations and dates
-        tmp.remove()
+        try:
+            tmp.remove()
+        except NameError:
+            pass
         """
         text.remove()
 
@@ -442,10 +454,9 @@ if makemovie:
                         fontsize=fsz2, zorder=5, transform=ax.transAxes)
         """
         # put the planets in the correct location
-        phase = 2. * np.pi * (time - t0s) / periods
-        print(phase)
-        tmp = plt.scatter(fullxcens + semis * np.cos(phase),
-                          fullycens + semis * np.sin(phase),
+        phase = 2. * np.pi * (time - t0s) / periods*10
+        tmp = plt.scatter(fullxcens + np.log10(semis) * np.cos(phase),
+                          fullycens + np.log10(semis) * np.sin(phase),
                           marker='o', edgecolors='none', lw=0, s=pscale, c=teqs,
                           vmin=ticks.min(), vmax=ticks.max(),
                           zorder=3, cmap=mycmap, clip_on=False)
