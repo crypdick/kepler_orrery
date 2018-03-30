@@ -12,13 +12,14 @@ cd = os.path.abspath(os.path.dirname(__file__))
 koilist = os.path.join(cd, 'KOI_List.txt')
 
 # are we loading in system locations from a previous file (None if not)
-lcenfile = os.path.join(cd, 'orrery_centers.txt')
+centers_file = os.path.join(cd, 'orrery_centers.txt')
 # lcenfile = None
 # if we're not loading a centers file,
 # where do we want to save the one generated (None if don't save)
 # scenfile = os.path.join(cd, 'orrery_centers_2.txt')
 scenfile = None
 
+'''
 # add in the solar system to the plots
 addsolar = True
 # put it at a fixed location? otherwise use posinlist to place it
@@ -31,6 +32,7 @@ ssy = 1.
 # if fixedpos is False.
 # 0 puts it first and near the center, 1 puts it last on the outside
 posinlist = 0.25
+'''
 
 # making rstart smaller or maxtry bigger takes longer but tightens the
 # circle
@@ -53,22 +55,22 @@ fszs1 = {480: 12, 720: 14, 1080: 22}
 fszs2 = {480: 15, 720: 17, 1080: 27}
 
 # background color
-bkcol = 'black'
+background_color = 'black'
 
 # color and alpha for the circular orbit paths
-orbitcol = '#424242'
+orbit_color = '#424242'
 orbitalpha = 1.
 
 # add a background to the legend to distinguish it?
-legback = True
+legend_background = False
 # if so, use this color and alpha
-legbackcol = bkcol
-legalpha = 0.7
+legend_bg_color = background_color
+legend_alpha = 0.7
 
 # are we making the png files for a movie or gif
 makemovie = True
 # resolution of the images. Currently support 480, 720 or 1080.
-reso = 480
+resolution = 480
 
 # output directory for the images in the movie
 # (will be created if it doesn't yet exist)
@@ -87,7 +89,7 @@ times = np.arange(1591 - nframes / 2., 1591, 0.5)
 # setup for the custom zoom levels
 inds = np.arange(len(times))
 nmax = inds[-1]
-zooms = np.zeros_like(times) - 1.
+zooms = np.ones_like(times)
 
 # what zoom level each frame is at (1. means default with everything)
 
@@ -98,13 +100,14 @@ zooms[inds > 0.7 * nmax] = 1.
 zooms[zooms < 0.] = np.interp(inds[zooms < 0.], inds[zooms > 0.],
                               zooms[zooms > 0.])
 """
+"""
 # zoom out then back in
 zooms[inds < 0.25 * nmax] = 0.35
 zooms[(inds > 0.5 * nmax) & (inds < 0.6 * nmax)] = 1.
 zooms[inds > 0.85 * nmax] = 0.35
 zooms[zooms < 0.] = np.interp(inds[zooms < 0.], inds[zooms > 0.],
                               zooms[zooms > 0.])
-
+"""
 # ===================================== #
 
 # reference time for the Kepler data
@@ -129,8 +132,8 @@ radius = radius[good]
 iteqs = iteqs[good]
 
 # if we've already decided where to put each system, load it up
-if lcenfile is not None:
-    multikics, xcens, ycens, maxsemis = np.loadtxt(lcenfile, unpack=True)
+if centers_file is not None:
+    multikics, xcens, ycens, maxsemis = np.loadtxt(centers_file, unpack=True)
     nplan = len(multikics)
 # otherwise figure out how to fit all the planets into a nice distribution
 else:
@@ -152,6 +155,7 @@ else:
     maxsemis = maxsemis[inds]
     multikics = multikics[inds]
 
+    '''
     # add in the solar system if desired
     if addsolar:
         nplan += 1
@@ -165,6 +169,7 @@ else:
 
         maxsemis = np.insert(maxsemis, insind, 1.524)
         multikics = np.insert(multikics, insind, kicsolar)
+    '''
 
     # ratio = x extent / y extent
     # what is the maximum and minimum aspect ratio of the final placement
@@ -185,6 +190,7 @@ else:
         if (ii % 20) == 0:
             print( 'Placing {0} of {1} planets'.format(ii, nplan))
 
+        """
         # put the solar system at its fixed position if desired
         if multikics[ii] == kicsolar and fixedpos:
             xcens = np.concatenate((xcens, [ssx]))
@@ -193,6 +199,7 @@ else:
         else:
             xcens = np.concatenate((xcens, [0.]))
             ycens = np.concatenate((ycens, [0.]))
+        """
 
         # repeat until we find an open location for this system
         while repeat:
@@ -264,6 +271,7 @@ fullxcens = np.array([])
 fullycens = np.array([])
 
 for ii in np.arange(nplan):
+    """
     # known solar system parameters
     if addsolar and multikics[ii] == kicsolar:
         usedkics = np.concatenate((usedkics, np.ones(8) * kicsolar))
@@ -285,6 +293,7 @@ for ii in np.arange(nplan):
         fullxcens = np.concatenate((fullxcens, np.zeros(8) + xcens[ii]))
         fullycens = np.concatenate((fullycens, np.zeros(8) + ycens[ii]))
         continue
+    """
 
     fd = np.where(kics == multikics[ii])[0]
     # get the values for this system
@@ -316,13 +325,13 @@ else:
 
 # create the figure at the right size (this assumes a default pix/inch of 100)
 figsizes = {480: (8.54, 4.8), 720: (8.54, 4.8), 1080: (19.2, 10.8)}
-fig = plt.figure(figsize=figsizes[reso], frameon=False)
+fig = plt.figure(figsize=figsizes[resolution], frameon=False)
 
 # make the plot cover the entire figure with the right background colors
 ax = fig.add_axes([0.0, 0, 1, 1])
 ax.axis('off')
-fig.patch.set_facecolor(bkcol)
-plt.gca().patch.set_facecolor(bkcol)
+fig.patch.set_facecolor(background_color)
+plt.gca().patch.set_facecolor(background_color)
 
 # don't count the orbits of the outer solar system in finding figure limits
 ns = np.where(usedkics != kicsolar)[0]
@@ -359,21 +368,21 @@ for ii in np.arange(len(t0s)):
     # solid, thinner lines for normal planets
     ls = 'solid'
     zo = 0
-    lw = lws[reso]
+    lw = lws[resolution]
     # dashed, thicker ones for the solar system
     if usedkics[ii] == kicsolar:
         ls = 'dashed'
         zo = -3
-        lw = sslws[reso]
+        lw = sslws[resolution]
 
     c = plt.Circle((fullxcens[ii], fullycens[ii]), semis[ii], clip_on=False,
                    alpha=orbitalpha, fill=False,
-                   color=orbitcol, zorder=zo, ls=ls, lw=lw)
+                   color=orbit_color, zorder=zo, ls=ls, lw=lw)
     fig.gca().add_artist(c)
 
 # set up the planet size scale
 sscales = {480: 12., 720: 30., 1080: 50.}
-sscale = sscales[reso]
+sscale = sscales[resolution]
 
 rearth = 1.
 rnep = 3.856
@@ -409,20 +418,23 @@ tmp = plt.scatter(fullxcens + semis * np.cos(phase),
                   edgecolors='none', lw=0, s=pscale, c=teqs, vmin=ticks.min(),
                   vmax=ticks.max(), zorder=3, cmap=mycmap, clip_on=False)
 
-fsz1 = fszs1[reso]
-fsz2 = fszs2[reso]
+fsz1 = fszs1[resolution]
+fsz2 = fszs2[resolution]
 prop = fm.FontProperties(fname=fontfile)
 
+"""
 # create the 'Solar System' text identification
 if addsolar:
     loc = np.where(usedkics == kicsolar)[0][0]
     plt.text(fullxcens[loc], fullycens[loc], 'Solar\nSystem', zorder=-2,
              color=fontcol, family=fontfam, fontproperties=prop, fontsize=fsz1,
              horizontalalignment='center', verticalalignment='center')
+"""
 
+"""
 # if we're putting in a translucent background behind the text
 # to make it easier to read
-if legback:
+if legend_background:
     box1starts = {480: (0., 0.445), 720: (0., 0.46), 1080: (0., 0.47)}
     box1widths = {480: 0.19, 720: 0.147, 1080: 0.153}
     box1heights = {480: 0.555, 720: 0.54, 1080: 0.53}
@@ -433,18 +445,20 @@ if legback:
 
     # create the rectangles at the right heights and widths
     # based on the resolution
-    c = plt.Rectangle(box1starts[reso], box1widths[reso], box1heights[reso],
-                      alpha=legalpha, fc=legbackcol, ec='none', zorder=4,
+    c = plt.Rectangle(box1starts[resolution], box1widths[resolution], box1heights[resolution],
+                      alpha=legend_alpha, fc=legend_bg_color, ec='none', zorder=4,
                       transform=ax.transAxes)
-    d = plt.Rectangle(box2starts[reso], box2widths[reso], box2heights[reso],
-                      alpha=legalpha, fc=legbackcol, ec='none', zorder=4,
+    d = plt.Rectangle(box2starts[resolution], box2widths[resolution], box2heights[resolution],
+                      alpha=legend_alpha, fc=legend_bg_color, ec='none', zorder=4,
                       transform=ax.transAxes)
     ax.add_artist(c)
     ax.add_artist(d)
+"""
 
 # appropriate spacing from the left edge for the color bar
 cbxoffs = {480: 0.09, 720: 0.07, 1080: 0.074}
-cbxoff = cbxoffs[reso]
+cbxoff = cbxoffs[resolution]
+
 
 # plot the solar system planet scale
 ax.scatter(np.zeros(len(solarscale)) + cbxoff,
@@ -460,6 +474,7 @@ for ii in np.arange(len(solarscale)):
             fontproperties=prop, fontsize=fsz1, zorder=5,
             transform=ax.transAxes)
 
+"""
 # colorbar axis on the left centered with the planet scale
 ax2 = fig.add_axes([cbxoff - 0.005, 0.54, 0.01, 0.3])
 ax2.set_zorder(2)
@@ -488,6 +503,7 @@ clab = 'Planet Equilibrium\nTemperature (K)'
 # add the overall label at the bottom of the color bar
 cbar.ax.set_xlabel(clab, color=fontcol, family=fontfam, fontproperties=prop,
                    size=fsz1, zorder=5)
+"""
 
 # switch back to the main plot
 plt.sca(ax)
@@ -497,10 +513,11 @@ txtxoffs = {480: 0.2, 720: 0.16, 1080: 0.16}
 txtyoffs1 = {480: 0.10, 720: 0.08, 1080: 0.08}
 txtyoffs2 = {480: 0.18, 720: 0.144, 1080: 0.144}
 
-txtxoff = txtxoffs[reso]
-txtyoff1 = txtyoffs1[reso]
-txtyoff2 = txtyoffs2[reso]
+txtxoff = txtxoffs[resolution]
+txtyoff1 = txtyoffs1[resolution]
+txtyoff2 = txtyoffs2[resolution]
 
+"""
 # put in the credits in the top right
 text = plt.text(1. - txtxoff, 1. - txtyoff1,
                 time0.strftime('Kepler Orrery IV\n%d %b %Y'), color=fontcol,
@@ -510,6 +527,7 @@ plt.text(1. - txtxoff, 1. - txtyoff2, 'By Ethan Kruse\n@ethan_kruse',
          color=fontcol, family=fontfam,
          fontproperties=prop, fontsize=fsz1,
          zorder=5, transform=ax.transAxes)
+"""
 
 # the center of the figure
 x0 = np.mean(plt.xlim())
@@ -533,6 +551,7 @@ if makemovie:
     for ii, time in enumerate(times):
         # remove old planet locations and dates
         tmp.remove()
+        """
         text.remove()
 
         # re-zoom to appropriate level
@@ -546,6 +565,7 @@ if makemovie:
                         color=fontcol, family=fontfam,
                         fontproperties=prop,
                         fontsize=fsz2, zorder=5, transform=ax.transAxes)
+        """
         # put the planets in the correct location
         phase = 2. * np.pi * (time - t0s) / periods
         tmp = plt.scatter(fullxcens + semis * np.cos(phase),
